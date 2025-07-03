@@ -1,0 +1,11 @@
+Checkmarx/ast-vscode-extension
+Checkmarx/ast-jetbrains-plugin
+Checkmarx/ast-cli
+Checkmarx/ast-eclipse-plugin
+Checkmarx/ast-teamcity-plugin
+Checkmarx/ast-visual-studio-extension
+Checkmarx/ast-github-action
+Checkmarx/ast-azure-plugin
+Checkmarx/ast-cli-maven-plugin
+jenkinsci/checkmarx-ast-scanner-plugin
+Checkmarx/plugins-release-workflow
