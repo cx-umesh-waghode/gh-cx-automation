@@ -1,0 +1,37 @@
+name: Generate PR Dashboard
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # every 30 min
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Generate PR list
+      run: |
+        ORG_NAME=my-org
+        TOKEN=${{ secrets.GITHUB_TOKEN }}
+        echo "<h2>Open Pull Requests in $ORG_NAME</h2>" > pr-list.html
+        echo "<ul>" >> pr-list.html
+
+        curl -s -H "Authorization: token $TOKEN" "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100" |
+          jq -r '.[].full_name' | while read repo; do
+            prs=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/repos/$repo/pulls?state=open")
+            echo "$prs" | jq -r --arg r "$repo" '.[] | "<li><a href=\"" + .html_url + "\">[" + $r + "] " + .title + "</a></li>"' >> pr-list.html
+          done
+
+        echo "</ul>" >> pr-list.html
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: .
+
+    - name: Deploy to GitHub Pages
+      uses: actions/deploy-pages@v2
