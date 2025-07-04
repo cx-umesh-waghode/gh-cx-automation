@@ -1,9 +1,7 @@
 name: Generate PR Dashboard
 
 on:
-#  schedule:
-#    - cron: '*/30 * * * *'  # every 30 min
-#  workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   build:
