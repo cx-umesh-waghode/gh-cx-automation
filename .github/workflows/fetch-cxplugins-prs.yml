@@ -22,11 +22,11 @@ jobs:
           mkdir -p public
           echo "<h2>Open Pull Requests in $ORG_NAME</h2>" > public/index.html
           echo "<ul>" >> public/index.html
-          curl -s -H "Authorization: token $TOKEN" "https://api.github.com/orgs/$ORG_NAME/repos?per_page=100" |
-            jq -r '.[].full_name' | while read repo; do
-              prs=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/repos/$repo/pulls?state=open")
-              echo "$prs" | jq -r --arg r "$repo" '.[] | "<li><a href=\"" + .html_url + "\">[" + $r + "] " + .title + "</a></li>"' >> public/index.html
-            done
+          while read repo; do
+            echo "Fetching PRs for $repo..."
+            prs=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/repos/$repo/pulls?state=open")
+            echo "$prs" | jq -r --arg r "$repo" '.[] | "<li><a href=\"" + .html_url + "\">[" + $r + "] " + .title + "</a></li>"' >> public/index.html
+          done < repos.txt
           echo "</ul>" >> public/index.html
 
       - name: Upload Pages artifact
