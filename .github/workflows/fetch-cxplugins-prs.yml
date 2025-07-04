@@ -21,53 +21,7 @@ jobs:
           TOKEN=${{ secrets.GITHUB_TOKEN }}
           mkdir -p public
           OUTPUT_FILE=public/index.html
-          PR_DATA_FILE=tmp/prs.json
 
-          echo "[]" > $PR_DATA_FILE
-
-          while read repo; do
-            echo "Fetching PRs for $repo..."
-            prs=$(curl -s -H "Authorization: token $TOKEN" \
-              "https://api.github.com/repos/$repo/pulls?state=open&per_page=100")
-
-            echo "$prs" | jq -c --arg repo "$repo" '.[] | {
-              repo: $repo,
-              number: .number,
-              title: .title,
-              author: .user.login,
-              created_at: .created_at,
-              url: .html_url,
-              sha: .head.sha
-            }' >> tmp/tmp_prs.json
-          done < repos.txt
-
-          # Merge all JSON lines into an array and sort by created_at DESC
-          jq -s 'flatten | sort_by(.created_at) | reverse' tmp/tmp_prs.json > $PR_DATA_FILE
-          rm tmp/tmp_prs.json
-
-          # Get check status for each PR
-          echo "Adding check statuses..."
-          jq -c '.[]' $PR_DATA_FILE | while read pr; do
-            repo=$(echo $pr | jq -r '.repo')
-            sha=$(echo $pr | jq -r '.sha')
-
-            check_status="unknown"
-            check_json=$(curl -s -H "Authorization: token $TOKEN" \
-              "https://api.github.com/repos/$repo/commits/$sha/check-runs")
-
-            conclusion=$(echo "$check_json" | jq -r '.check_runs[0].conclusion // "pending"')
-            if [[ "$conclusion" == "null" ]]; then
-              conclusion="pending"
-            fi
-
-            # Add checks to PR object
-            pr=$(echo "$pr" | jq --arg checks "$conclusion" '. + {checks: $checks}')
-            echo "$pr" >> tmp/final_prs.json
-          done
-
-          jq -s '.' tmp/final_prs.json > $PR_DATA_FILE
-
-          # Generate HTML
           cat <<EOF > $OUTPUT_FILE
           <!DOCTYPE html>
           <html>
@@ -81,13 +35,10 @@ jobs:
               th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
               th { background-color: #f4f4f4; }
               tr:hover { background-color: #f9f9f9; }
-              .success { color: green; font-weight: bold; }
-              .failure { color: red; font-weight: bold; }
-              .pending { color: orange; font-weight: bold; }
             </style>
           </head>
           <body>
-            <h2>Open Pull Requests (Sorted by Created Date)</h2>
+            <h2>Open Pull Requests</h2>
             <table>
               <tr>
                 <th>Repository</th>
@@ -95,27 +46,23 @@ jobs:
                 <th>Title</th>
                 <th>Author</th>
                 <th>Created</th>
-                <th>Checks</th>
                 <th>Link</th>
               </tr>
           EOF
 
-          jq -c '.[]' $PR_DATA_FILE | while read pr; do
-            repo=$(echo "$pr" | jq -r '.repo')
-            number=$(echo "$pr" | jq -r '.number')
-            title=$(echo "$pr" | jq -r '.title' | sed 's/&/&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
-            author=$(echo "$pr" | jq -r '.author')
-            created=$(echo "$pr" | jq -r '.created_at' | cut -d'T' -f1)
-            url=$(echo "$pr" | jq -r '.url')
-            checks=$(echo "$pr" | jq -r '.checks')
+          while read repo; do
+            echo "Fetching PRs for $repo..."
+            prs=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/repos/$repo/pulls?state=open")
 
-            # Color class for check status
-            class="pending"
-            [[ "$checks" == "success" ]] && class="success"
-            [[ "$checks" == "failure" ]] && class="failure"
-
-            echo "<tr><td>$repo</td><td>$number</td><td>$title</td><td>$author</td><td>$created</td><td class=\"$class\">$checks</td><td><a href=\"$url\">View PR</a></td></tr>" >> $OUTPUT_FILE
-          done
+            echo "$prs" | jq -r --arg r "$repo" '
+              .[] | "<tr><td>" + $r + "</td><td>" + 
+              (.number | tostring) + "</td><td>" +
+              (.title | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;")) + "</td><td>" +
+              .user.login + "</td><td>" +
+              (.created_at | split("T")[0]) + "</td><td>" +
+              "<a href=\"" + .html_url + "\">View PR</a></td></tr>"
+            ' >> $OUTPUT_FILE
+          done < repos.txt
 
           cat <<EOF >> $OUTPUT_FILE
             </table>
