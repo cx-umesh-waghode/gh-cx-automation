@@ -20,7 +20,7 @@ jobs:
           ORG_NAME=my-org
           TOKEN=${{ secrets.GITHUB_TOKEN }}
           mkdir -p public
-OUTPUT_FILE=public/index.html
+          OUTPUT_FILE=public/index.html
 
           cat <<EOF > $OUTPUT_FILE
           <!DOCTYPE html>
