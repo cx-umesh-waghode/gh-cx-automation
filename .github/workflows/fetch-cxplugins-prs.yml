@@ -20,14 +20,55 @@ jobs:
           ORG_NAME=my-org
           TOKEN=${{ secrets.GITHUB_TOKEN }}
           mkdir -p public
-          echo "<h2>Open Pull Requests in $ORG_NAME</h2>" > public/index.html
-          echo "<ul>" >> public/index.html
+OUTPUT_FILE=public/index.html
+
+          cat <<EOF > $OUTPUT_FILE
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>PR Dashboard</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              h2 { color: #333; }
+              table { border-collapse: collapse; width: 100%; }
+              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+              th { background-color: #f4f4f4; }
+              tr:hover { background-color: #f9f9f9; }
+            </style>
+          </head>
+          <body>
+            <h2>Open Pull Requests</h2>
+            <table>
+              <tr>
+                <th>Repository</th>
+                <th>PR #</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Created</th>
+                <th>Link</th>
+              </tr>
+          EOF
+
           while read repo; do
             echo "Fetching PRs for $repo..."
             prs=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/repos/$repo/pulls?state=open")
-            echo "$prs" | jq -r --arg r "$repo" '.[] | "<li><a href=\"" + .html_url + "\">[" + $r + "] " + .title + "</a></li>"' >> public/index.html
+
+            echo "$prs" | jq -r --arg r "$repo" '
+              .[] | "<tr><td>" + $r + "</td><td>" + 
+              (.number | tostring) + "</td><td>" +
+              (.title | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;")) + "</td><td>" +
+              .user.login + "</td><td>" +
+              (.created_at | split("T")[0]) + "</td><td>" +
+              "<a href=\"" + .html_url + "\">View PR</a></td></tr>"
+            ' >> $OUTPUT_FILE
           done < repos.txt
-          echo "</ul>" >> public/index.html
+
+          cat <<EOF >> $OUTPUT_FILE
+            </table>
+          </body>
+          </html>
+          EOF
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
